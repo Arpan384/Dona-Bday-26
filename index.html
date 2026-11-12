@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0d0a0b">
+  <title>For You ♡</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- ============ HOME: three posters ============ -->
+  <main id="home" class="home">
+    <header class="marquee">
+      <p class="eyebrow">Now showing · a film in three parts</p>
+      <h1 class="marquee-title">For <em id="home-name">you</em></h1>
+      <p class="marquee-sub" id="home-sub"></p>
+    </header>
+    <div class="posters" id="posters"></div>
+    <p class="home-foot">turn your sound on ♪</p>
+  </main>
+
+  <!-- ============ PART I ============ -->
+  <section class="scene scene-split" id="scene-0" hidden>
+    <button class="back" type="button" aria-label="Back to posters">← back</button>
+    <div class="hearts" aria-hidden="true"></div>
+    <div class="split">
+      <div class="split-text">
+        <p class="eyebrow reveal-item" id="p1-eyebrow"></p>
+        <h2 class="display reveal-item" id="p1-title"></h2>
+        <div class="letter prose" id="p1-body" aria-live="polite"></div>
+        <div class="letter-nav reveal-item" id="p1-nav">
+          <button type="button" class="letter-btn" id="p1-prev" aria-label="Previous page">← </button>
+          <div class="letter-dots" id="p1-dots"></div>
+          <button type="button" class="letter-btn" id="p1-next">next →</button>
+        </div>
+      </div>
+      <div class="split-media">
+        <div class="scratch" id="scratch">
+          <img id="p1-img" alt="Our first picture together">
+          <canvas id="scratch-canvas" aria-label="Scratch to reveal a photo"></canvas>
+        </div>
+        <p class="media-caption" id="p1-caption"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PART II ============ -->
+  <section class="scene scene-film" id="scene-1" hidden>
+    <button class="back" type="button" aria-label="Back to posters">← back</button>
+    <div class="film-stage" id="film-stage"></div>
+    <div class="film-hud">
+      <div class="film-progress"><span id="film-bar"></span></div>
+      <div class="film-controls">
+        <button type="button" id="film-prev" aria-label="Previous">‹</button>
+        <button type="button" id="film-play" aria-label="Pause">❚❚</button>
+        <button type="button" id="film-next" aria-label="Next">›</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PART III ============ -->
+  <section class="scene scene-split scene-night" id="scene-2" hidden>
+    <button class="back" type="button" aria-label="Back to posters">← back</button>
+    <div class="stars" aria-hidden="true"></div>
+    <div class="split">
+      <div class="split-text reel">
+        <div class="reel-stage" id="reel-stage" aria-live="polite"></div>
+        <p class="signoff" id="p3-sign"></p>
+        <button class="ghost" type="button" id="reel-replay" hidden>play again</button>
+      </div>
+      <div class="split-media">
+        <figure class="polaroid"><img id="p3-img" alt="Us"></figure>
+      </div>
+    </div>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

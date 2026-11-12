@@ -20,3 +20,16 @@ A birthday site told in three parts, styled as movie posters. Each part unlocks 
 - The time locks only run in the browser. Anyone who reads the page's source could see the content early. The page is also hidden from search engines (`noindex`).
 - The photos are resized, and their location (GPS) data was removed before they were added here.
 - Browsers only play music after a tap. Tapping a poster counts, so the song starts when she opens a part.
+
+## Media
+
+- **Clips** for Part II live in `assets/clips/`: web-ready, muted, 720p copies of `assets/videos/<year>/`. In `config.js` each clip has `from`/`to` (seconds) to choose the part that plays.
+- **Archive** videos live in `assets/archive/`: 720p copies of `assets/videos/ashes/`, with a thumbnail for each.
+- **Lyrics** are in `assets/music/part2-lyrics.js`, as `[mm:ss.xx] line`. With `?preview=…`, the film shows the song's current time so you can adjust them.
+- **Raw files:** `assets/videos/` is git-ignored, so only the web copies go to GitHub. The raw photos in `assets/photos/extra` and `other` are already web-ready in `assets/photos/new/` and can be removed from the repo.
+
+## Trimmed clips & originals
+
+- `assets/clips/` now holds **trimmed** clips: just the part that plays, plus ½ s either side. In `config.js` each clip's `from`/`to` refers to the trimmed file, and `orig` notes the range in the original.
+- The untrimmed originals are kept in `assets/clips-full/`, and the original `part1.mp3` is in `assets/music-originals/`. Both folders are git-ignored, so they stay on your computer and are never deployed.
+- To use a different moment from a clip, re-trim it from `assets/clips-full/` with the new range (or ask Claude to).

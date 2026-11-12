@@ -9,22 +9,76 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♡</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,500&family=Inter:wght@400;500;600&family=Oswald:wght@300;400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
 
+  <!-- first tap: starts the music (browsers need one tap before any sound) -->
+  <div class="curtain" id="curtain" hidden>
+    <!-- the "screen" behind the drapes: an old film-leader countdown -->
+    <div class="leader" id="leader" aria-hidden="true">
+      <div class="leader-ring"></div><div class="leader-sweep"></div>
+      <i class="leader-h"></i><i class="leader-v"></i>
+      <span class="leader-num" id="leader-num">3</span>
+    </div>
+    <div class="drape drape-l" aria-hidden="true"></div>
+    <div class="drape drape-r" aria-hidden="true"></div>
+    <div class="valance" aria-hidden="true"></div>
+    <button type="button" class="curtain-inner" id="curtain-btn">
+      <span class="studio" id="curtain-studio"></span>
+      <span class="curtain-title" id="curtain-name">you</span>
+      <span class="curtain-tag" id="curtain-tag"></span>
+      <span class="curtain-cta">tap to begin <span aria-hidden="true">♪</span></span>
+    </button>
+  </div>
+  <button type="button" class="sound-toggle" id="sound-toggle" aria-label="Mute music" hidden>♪</button>
+
   <!-- ============ HOME: three posters ============ -->
+  <div class="home-bg" id="home-bg" aria-hidden="true"></div>
   <main id="home" class="home">
-    <header class="marquee">
-      <p class="eyebrow">Now showing · a film in three parts</p>
-      <h1 class="marquee-title">For <em id="home-name">you</em></h1>
-      <p class="marquee-sub" id="home-sub"></p>
+    <header class="marquee intro">
+      <p class="studio" id="m-studio"></p>
+      <h1 class="marquee-title" id="m-title"></h1>
+      <p class="marquee-tag" id="m-tag"></p>
+      <div class="marquee-rule" aria-hidden="true"></div>
+      <p class="marquee-sub" id="m-sub"></p>
+      <p class="billing" id="m-billing"></p>
+      <span class="rating" id="m-rating"></span>
     </header>
     <div class="posters" id="posters"></div>
+
+    <section class="archive" id="archive" hidden>
+      <div class="archive-head">
+        <p class="eyebrow" id="archive-title"></p>
+        <p class="archive-sub" id="archive-sub"></p>
+      </div>
+      <div class="archive-row" id="archive-row"></div>
+    </section>
+
     <p class="home-foot">turn your sound on ♪</p>
   </main>
+
+  <!-- archive video player -->
+  <div class="player" id="player" hidden role="dialog" aria-modal="true" aria-label="Video player">
+    <div class="player-box">
+      <button type="button" class="player-close" id="player-close" aria-label="Close">✕</button>
+      <video id="player-video" controls playsinline preload="metadata"></video>
+      <p class="player-title" id="player-title"></p>
+    </div>
+  </div>
+
+  <!-- archive challenge (question / little game) -->
+  <div class="challenge" id="challenge" hidden role="dialog" aria-modal="true" aria-labelledby="ch-kicker">
+    <div class="ch-box">
+      <button type="button" class="player-close ch-close" id="ch-close" aria-label="Close">✕</button>
+      <p class="eyebrow" id="ch-kicker"></p>
+      <h3 class="ch-prompt" id="ch-prompt"></h3>
+      <div class="ch-body" id="ch-body"></div>
+      <p class="ch-for" id="ch-for"></p>
+    </div>
+  </div>
 
   <!-- ============ PART I ============ -->
   <section class="scene scene-split" id="scene-0" hidden>
@@ -42,9 +96,12 @@
         </div>
       </div>
       <div class="split-media">
-        <div class="scratch" id="scratch">
-          <img id="p1-img" alt="Our first picture together">
-          <canvas id="scratch-canvas" aria-label="Scratch to reveal a photo"></canvas>
+        <div class="scratch-wrap" id="scratch-wrap">
+          <div class="fan" id="p1-fan"></div>
+          <div class="scratch" id="scratch">
+            <img id="p1-img" alt="Our first picture together">
+            <canvas id="scratch-canvas" aria-label="Scratch to reveal a photo"></canvas>
+          </div>
         </div>
         <p class="media-caption" id="p1-caption"></p>
       </div>
@@ -55,13 +112,19 @@
   <section class="scene scene-film" id="scene-1" hidden>
     <button class="back" type="button" aria-label="Back to posters">← back</button>
     <div class="film-stage" id="film-stage"></div>
+    <div class="film-bokeh" id="film-bokeh" aria-hidden="true"></div>
+    <div class="film-vignette" aria-hidden="true"></div>
+    <div class="film-leak" id="film-leak" aria-hidden="true"></div>
+    <div class="lyric" id="lyric" aria-live="off"><span class="lyric-line"></span><span class="lyric-line"></span></div>
     <div class="film-hud">
       <div class="film-progress"><span id="film-bar"></span></div>
       <div class="film-controls">
         <button type="button" id="film-prev" aria-label="Previous">‹</button>
         <button type="button" id="film-play" aria-label="Pause">❚❚</button>
         <button type="button" id="film-next" aria-label="Next">›</button>
+        <button type="button" id="film-cc" class="cc on" aria-label="Lyrics on/off" title="lyrics">CC</button>
       </div>
+      <div class="film-time" id="film-time" hidden></div>
     </div>
   </section>
 
@@ -76,12 +139,16 @@
         <button class="ghost" type="button" id="reel-replay" hidden>play again</button>
       </div>
       <div class="split-media">
-        <figure class="polaroid"><img id="p3-img" alt="Us"></figure>
+        <div class="pola-pile" id="p3-pile">
+          <figure class="polaroid p3-main"><img id="p3-img" alt="Us"></figure>
+          <figure class="polaroid p3-first" hidden><img id="p3-img2" alt="Us"></figure>
+        </div>
       </div>
     </div>
   </section>
 
   <script src="config.js"></script>
+  <script src="assets/music/part2-lyrics.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

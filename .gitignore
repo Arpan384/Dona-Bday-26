@@ -1,3 +1,9 @@
 .DS_Store
 
 videos/
+photos/extra
+photos/other
+
+# originals kept locally (not deployed)
+assets/clips-full/
+assets/music-originals/

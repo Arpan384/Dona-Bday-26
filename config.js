@@ -219,7 +219,7 @@ window.BDAY = {
   archive: {
     title: "From the archives",
     subtitle: "birthdays gone by, kept forever",
-    unlock: { dayOffset: 0, time: "00:00" },   // before this the cards say "coming soon"
+    unlock: { dayOffset: 0, time: "00:10" },   // before this the cards say "coming soon"
 
     // ✏️ Google Sheet saving — see SETUP-SHEETS.md. Leave saveUrl "" to keep everything in this browser only.
     saveUrl: "https://script.google.com/macros/s/AKfycbwtTCWa6e7iXkPw-Jm6LhfyhtNIZ9KYPoSxabUopPbo7m36FX_sV5Y4zkOKHijsIu-dWA/exec",               // the Apps Script "Web app" URL (ends in /exec)
@@ -289,6 +289,71 @@ window.BDAY = {
         }
       }
     ]
+  },
+
+  /* ---------- ONE MORE THING : the epilogue ----------
+     Appears under the archives once all 5 are unlocked, and opens at the time below.
+     Everything here plays as one continuous, full-screen scene. */
+  epilogue: {
+    unlock: { dayOffset: 0, time: "23:55" },        // 11:55 PM on her birthday (and all 5 archives must be unlocked)
+    song: "assets/music/bonus.mp3",
+    songStart: "0:00",                              // ✏️ where the song begins, "m:ss"
+    musicVolume: 0.9,                               // normal level
+    duckTo: 0.06,                                   // almost silent while your recorded video plays
+
+    // the card on the home screen
+    card: {
+      eyebrow: "And when you think it's over…",
+      title: "One More Thing…",
+      sub: "Some stories are too beautiful to end here.",
+      locked: "A little surprise awaits",
+      pill: "Unlocks at 11:55 PM",
+      begin: "begin"
+    },
+    reveal: ["You thought the story was over?", "There's one more thing…"],   // plays on the card at 11:55 PM
+
+    // the scene
+    titleEyebrow: "an epilogue",
+    title: "One More Thing…",
+    // Then → Now: the two photos are lined up on your faces ([x, y] of her face, then his, as 0–1 of the photo)
+    then: { src: "assets/epilogue/then.jpg", year: "2017", label: "then", faces: [[0.278, 0.294], [0.667, 0.194]] },
+    now:  { src: "assets/epilogue/now.jpg",  year: "2025", label: "now",  faces: [[0.463, 0.444], [0.572, 0.398]] },
+    farLine: "Look how far we've come.",
+    infA: "8 years…",
+    infB: "…and we're just getting started.",
+    message: { src: "assets/epilogue/message.mp4", poster: "assets/epilogue/message.jpg" },   // your recorded video
+    creditsSeconds: 45,                             // how long the credits take to roll
+    credits: [                                      // ✏️ [role, name]
+      ["Starring", "Dona"],
+      ["and", "Appu"],
+      ["Directed by", "Appu"],
+      ["Written by", "eight years of us"],
+
+      ["Best Supporting Character", "two hearts who never stopped choosing each other"],
+      ["Best Chemistry", "us, obviously"],
+
+      ["Production Design", "countless little surprises"],
+      ["Location Scouting", "every place we've been together"],
+      ["Costume Department", "all those pictures we took just for ourselves"],
+    
+      ["Stunts", "crossing roads, clumsily"],
+      ["Phone support", "permanently on silent"],
+      ["Technical Support", "Appu, obviously"],
+      ["Continuity errors", "every photo of us is crooked"],
+      ["Emotional Support", "endless hugs and reassurances"],
+
+      ["Executive Producer", "destiny, apparently"],
+      ["Music", "a song written for her"],
+      ["Original Score", "the songs she makes up about herself"],
+
+      ["Special thanks", "every 11th of October"],
+      ["Sequel Confirmed", "November 2027… coming soon ❤️"],
+    ],
+    standout: "Made with love, a thousand memories, countless revisions, a few happy tears, and one very nervous person behind the camera.",
+    tbc: { title: "To Be Continued…", line: "Our favourite chapters are still ahead of us.", foot: "The story isn't over" },
+    afterLine: "wait… one more scene",
+    after: { src: "assets/epilogue/after.mp4", poster: "assets/epilogue/after.jpg" },   // the after-credits clip (muted; the song plays over it)
+    finalLine: "forever begins every day with you"
   },
 
   /* ---------- PART III : the goodnight reel ---------- */

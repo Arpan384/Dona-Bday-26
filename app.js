@@ -105,36 +105,43 @@
     fadeTo(a, 0, 700, () => a.pause());
   }
 
-  /* ---------------- background music (home screen) ---------------- */
+  /* ---------------- background music (home screen) ----------------
+     bg.mp3 is a reward: it only starts once all 5 archives are unlocked (with the bonus background).
+     After the epilogue, its song keeps playing on the home screen (once, no loop), then hands over to bg.mp3. */
   const BG = C.bgMusic && C.bgMusic.src ? C.bgMusic : null;
-  const bg = BG ? Object.assign(new Audio(), { preload: "auto", loop: true, src: BG.src }) : null;
+  const bg = BG ? Object.assign(new Audio(), { preload: "none", loop: true, src: BG.src }) : null;
   let bgMuted = false, bgTimer = null, unlockedAudio = false, playerOpen = false;
-  function bgFade(target, ms, done) {
-    if (!bg) return;
+  let homeTrack = null;                                   // the epilogue's song, finishing on the home screen
+  const bgAllowed = () => { try { return allArchived(); } catch (e) { return false; } };
+  const homeAudio = () => homeTrack || (bg && bgAllowed() ? bg : null);
+  const homeLevel = (a) => a === bg ? (BG.volume != null ? BG.volume : 0.7) : ((C.epilogue && C.epilogue.musicVolume) || 0.9);
+  function bgFade(target, ms, done, a = homeAudio()) {
+    if (!a) return;
     clearInterval(bgTimer);
-    const from = bg.volume, t0 = performance.now();
+    const from = a.volume, t0 = performance.now();
     bgTimer = setInterval(() => {
       const k = Math.min(1, (performance.now() - t0) / ms);
-      try { bg.volume = from + (target - from) * k; } catch (e) {}
+      try { a.volume = from + (target - from) * k; } catch (e) {}
       if (k >= 1) { clearInterval(bgTimer); done && done(); }
     }, 40);
   }
   // resumes from where it was paused
   function bgResume() {
-    if (!bg || bgMuted || !unlockedAudio || current >= 0 || playerOpen) return;
-    unpark(bg);
-    bg.play().then(() => bgFade(BG.volume != null ? BG.volume : 0.7, 1800)).catch(() => {});
-  }
-  function bgPause(ms = 700) { if (bg && !bg.paused) bgFade(0, ms, () => bg.pause()); }
-  const soundBtn = $("#sound-toggle");
-  if (bg) {
+    const a = homeAudio();
+    if (!a || bgMuted || !unlockedAudio || current >= 0 || playerOpen) return;
     soundBtn.hidden = false;
-    soundBtn.addEventListener("click", () => {
-      bgMuted = !bgMuted; soundBtn.classList.toggle("off", bgMuted);
-      soundBtn.setAttribute("aria-label", bgMuted ? "Play music" : "Mute music");
-      bgMuted ? bgPause(400) : bgResume();
-    });
+    unpark(a);
+    if (a === bg) a.preload = "auto";
+    a.play().then(() => bgFade(homeLevel(a), 1800, null, a)).catch(() => {});
   }
+  function bgPause(ms = 700) { [bg, homeTrack].forEach((a) => { if (a && !a.paused) bgFade(0, ms, () => a.pause(), a); }); }
+  const soundBtn = $("#sound-toggle");
+  soundBtn.hidden = true;                                 // appears with the music
+  soundBtn.addEventListener("click", () => {
+    bgMuted = !bgMuted; soundBtn.classList.toggle("off", bgMuted);
+    soundBtn.setAttribute("aria-label", bgMuted ? "Play music" : "Mute music");
+    bgMuted ? bgPause(400) : bgResume();
+  });
 
   /* ---------------- home / posters ---------------- */
   const M = C.marquee || {};
@@ -229,11 +236,22 @@
   const AR = C.archive;
   const archiveOpen = () => !!(AR && now() >= unlockAt(AR));
   const TEST = PREVIEW;                                   // preview runs never touch her real progress
+  if (PREVIEW) {
+    const tag = el("div", "preview-tag", `preview${fakeNow ? " · " + esc(params.get("now")).replace("T", " ") : " · everything open"}`);
+    document.body.appendChild(tag);
+  }
   const STORE = TEST ? "bday-archive-test" : "bday-archive";
   const OUTBOX = STORE + "-outbox";
   const readLS = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-  if (TEST && params.has("reset")) { writeLS(STORE, {}); writeLS(OUTBOX, []); }
+  // ?preview=…&reset=1 → start the archives (and the epilogue's reveal) from scratch for testing.
+  // Earlier test answers stay in your Sheet's "Test" tab but are ignored from this moment on.
+  const RESET_AT = STORE + "-resetAt";
+  if (TEST && params.has("reset")) {
+    const round = Date.now();
+    writeLS(STORE, {}); writeLS(OUTBOX, []); writeLS(RESET_AT, round); writeLS(STORE + "-round", round);
+    try { localStorage.removeItem("bday-encore-test-revealed"); } catch (e) {}
+  }
   let unlocked = readLS(STORE, {});                       // { videoId: timestamp }
   const isUnlocked = (id) => !!unlocked[id];
   const cards = {};
@@ -244,22 +262,30 @@
     const os = /iPhone|iPad/.test(ua) ? "iPhone/iPad" : /Android/.test(ua) ? "Android" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "other";
     return `${os} · ${innerWidth}×${innerHeight}`;
   };
+  let flushing = false;
   async function flushOutbox() {
     if (!AR || !AR.saveUrl) return;
+    if (flushing) { setTimeout(flushOutbox, 1500); return; }   // one at a time, so nothing is sent twice
+    flushing = true;
+    try { await flushOnce(); } finally { flushing = false; }
+  }
+  async function flushOnce() {
     const box = readLS(OUTBOX, []);
-    const left = [];
+    const sent = new Set();
     for (const rec of box) {
       try {
         // text/plain keeps this a "simple" request, which Apps Script accepts from any site
         const r = await fetch(AR.saveUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(rec) });
         const j = await r.json();
-        if (!j.ok) left.push(rec);
-      } catch (e) { left.push(rec); }
+        if (j.ok) sent.add(rec.id + "|" + rec.at);
+      } catch (e) {}
     }
-    writeLS(OUTBOX, left);
+    // keep anything not sent yet, including answers added while this was sending
+    writeLS(OUTBOX, readLS(OUTBOX, []).filter((rec) => !sent.has(rec.id + "|" + rec.at)));
   }
   function record(it, kind, answer, details) {
-    const rec = { key: AR.saveKey, test: TEST, id: it.id, title: [it.title, it.note].filter(Boolean).join(" · "), kind, answer: answer || "", details: details || {}, device: device(), at: new Date().toISOString() };
+    const round = TEST && !String(it.id).startsWith("__reset__") ? readLS(RESET_AT, 0) : 0;
+    const rec = { key: AR.saveKey, test: TEST, id: round ? `${it.id}@${round}` : it.id, title: [it.title, it.note].filter(Boolean).join(" · "), kind, answer: answer || "", details: details || {}, device: device(), at: new Date().toISOString() };
     if (!AR.saveUrl) return;
     writeLS(OUTBOX, [...readLS(OUTBOX, []), rec]);
     flushOutbox();
@@ -269,7 +295,21 @@
     try {
       const r = await fetch(`${AR.saveUrl}?action=state&key=${encodeURIComponent(AR.saveKey)}${TEST ? "&test=1" : ""}`);
       const j = await r.json();
-      if (j.ok && j.unlocked) { unlocked = { ...j.unlocked, ...unlocked }; writeLS(STORE, unlocked); paintCards(); }
+      if (j.ok && j.unlocked) {
+        let remote = j.unlocked;
+        if (TEST) {
+          // In preview, each reset starts a new "round": answers are saved as "<video>@<round>", and only the
+          // latest round counts — on ANY device (the reset itself is saved as a "__reset__<round>" row).
+          const rounds = Object.keys(remote).filter((id) => id.startsWith("__reset__")).map((id) => +id.slice(9) || 0);
+          const round = Math.max(readLS(RESET_AT, 0), ...rounds, 0);
+          writeLS(RESET_AT, round);
+          remote = Object.fromEntries(Object.entries(remote)
+            .filter(([id]) => !id.startsWith("__reset__") && (round ? id.endsWith("@" + round) : !id.includes("@")))
+            .map(([id, t]) => [id.split("@")[0], t]));
+          if (round && readLS(STORE + "-round", 0) !== round) { unlocked = {}; writeLS(STORE + "-round", round); }   // a newer reset happened elsewhere
+        }
+        unlocked = { ...remote, ...unlocked }; writeLS(STORE, unlocked); paintCards();
+      }
     } catch (e) {}
   }
 
@@ -286,6 +326,7 @@
     img.onload = () => {
       hb.style.backgroundImage = `url('${AR.allUnlockedBackground}')`;
       document.body.classList.add("bonus");
+      bgResume();                                         // …and the home music begins, as part of the reward
       if (celebrate) {
         const t = el("div", "toast", "every memory unlocked ♡ &nbsp;home looks a little different now");
         document.body.appendChild(t);
@@ -338,6 +379,7 @@
       cards[it.id] = card;
       $("#archive-row").appendChild(card);
     });
+    if (TEST && params.has("reset")) record({ id: "__reset__" + readLS(RESET_AT, 0), title: "(preview reset)" }, "reset", "", {});
     paintCards(); setInterval(() => { paintCards(); maybeCelebrate(); }, 5000);
     flushOutbox(); pullState();
   }
@@ -584,25 +626,26 @@
   }
 
   /* ---------------- routing ---------------- */
-  const scenes = [0, 1, 2].map((i) => $("#scene-" + i));
-  const enter = [enterOne, enterTwo, enterThree];
-  const leave = [leaveOne, leaveTwo, leaveThree];
+  const scenes = [0, 1, 2, 3].map((i) => $("#scene-" + i));
+  const enter = [enterOne, enterTwo, enterThree, enterEncore];
+  const leave = [leaveOne, leaveTwo, leaveThree, leaveEncore];
+  const canOpen = (i) => (i === 3 ? encoreOpen() : isOpen(i));
   let current = -1;
 
   function route() {
     const m = location.hash.match(/^#part([123])$/);
-    const idx = m ? Number(m[1]) - 1 : -1;
-    if (idx >= 0 && !isOpen(idx)) { history.replaceState(null, "", location.pathname + location.search); return route(); }
+    const idx = location.hash === "#encore" ? 3 : m ? Number(m[1]) - 1 : -1;
+    if (idx >= 0 && !canOpen(idx)) { history.replaceState(null, "", location.pathname + location.search); return route(); }
     if (idx === current) return;
     if (current >= 0) { leave[current](); scenes[current].hidden = true; }
     current = idx;
     $("#home").hidden = idx >= 0;
     document.body.style.overflow = idx >= 0 ? "hidden" : "";
     document.body.classList.toggle("in-part", idx >= 0);
-    document.body.classList.toggle("in-film", idx === 1);   // lets the home background rest while a part is open
+    document.body.classList.toggle("in-film", idx === 1 || idx === 3);   // lets the home background rest while a part is open
     if (idx >= 0) { bgPause(); scenes[idx].hidden = false; scenes[idx].scrollTop = 0; enter[idx](); }
     else { stopSong(); setTimeout(bgResume, 500); }
-    soundBtn.hidden = !bg || idx >= 0;
+    soundBtn.hidden = idx >= 0 || !homeAudio();
   }
   window.addEventListener("hashchange", route);
   document.querySelectorAll(".back").forEach((b) => b.addEventListener("click", () => { location.hash = ""; route(); }));
@@ -1219,6 +1262,238 @@
   }
   function leaveThree() { reelTimers.forEach(clearTimeout); }
   $("#reel-replay").addEventListener("click", runReel);
+
+  /* =========================================================
+     ONE MORE THING — the epilogue
+     Shows under the archives once all 5 are unlocked; opens at 11:55 PM.
+     Plays as one continuous full-screen scene.
+     ========================================================= */
+  const EP = C.epilogue || null;
+  const encoreSec = $("#encore");
+  const allArchived = () => !!(AR && AR.items && AR.items.every((it) => !it.lock || isUnlocked(it.id)));
+  const encoreVisible = () => !!EP && (allArchived() || (PREVIEW && params.has("encore")));
+  function encoreOpen() { return encoreVisible() && now() >= unlockAt(EP); }
+  const SEEN = (TEST ? "bday-encore-test" : "bday-encore") + "-revealed";
+  let encoreState = "";
+
+  // can this browser change audio volume? (iPhones can't — there the song pauses instead of dipping)
+  const canSetVolume = (() => { try { const t = new Audio(); t.volume = 0.5; return Math.abs(t.volume - 0.5) < 0.01; } catch (e) { return false; } })();
+
+  if (EP) {
+    const K = EP.card || {};
+    $("#enc-eyebrow").textContent = K.eyebrow || "";
+    $("#enc-title").textContent = K.title || "One More Thing…";
+    $("#enc-sub").textContent = K.sub || "";
+    $("#enc-what").textContent = K.locked || "";
+    $("#enc-pill").textContent = K.pill || "";
+    $("#enc-begin").textContent = K.begin || "begin";
+    $("#enc-date").textContent = fmt(unlockAt(EP), { day: "numeric", month: "long" }) + " · " + fmt(unlockAt(EP), { hour: "numeric", minute: "2-digit", hour12: true });
+    // the whole card (and its button) opens it once it's unlocked
+    $("#enc-card").addEventListener("click", () => { if (encoreOpen() && $("#enc-card").classList.contains("is-open")) { location.hash = "encore"; route(); } });
+  }
+
+  // the card's own little moment at 11:55: the lock fades, two lines appear, then "begin"
+  function revealEncore(animate) {
+    const card = $("#enc-card");
+    const [l1, l2] = (EP.reveal || []);
+    $(".enc-r1").textContent = l1 || ""; $(".enc-r2").textContent = l2 || "";
+    let seen = false; try { seen = localStorage.getItem(SEEN) === "1"; } catch (e) {}
+    if (!animate || seen) { card.className = "enc-card is-open"; return; }
+    card.className = "enc-card is-revealing";
+    setTimeout(() => card.classList.add("r1"), 900);
+    setTimeout(() => card.classList.add("r2"), 3600);
+    setTimeout(() => { card.className = "enc-card is-open just"; try { localStorage.setItem(SEEN, "1"); } catch (e) {} }, 7200);
+  }
+  function tickEncore() {
+    if (!EP) return;
+    const st = !encoreVisible() ? "hidden" : encoreOpen() ? "open" : "locked";
+    if (st !== encoreState) {
+      const prev = encoreState; encoreState = st;
+      encoreSec.hidden = st === "hidden";
+      if (prev === "hidden" || prev === "") { encoreSec.classList.remove("appear"); void encoreSec.offsetWidth; encoreSec.classList.add("appear"); }
+      if (st === "locked") $("#enc-card").className = "enc-card is-locked";
+      if (st === "open") revealEncore(true);
+    }
+    if (st === "locked") $("#enc-count").textContent = countdown(unlockAt(EP) - now());
+    if (st !== "hidden" && current < 0 && now() >= unlockAt(EP) - 60 * 60e3) prefetchEncore();   // get it ready during the last hour
+  }
+
+  /* --- download everything ahead, like Part II, so it plays without a single stutter --- */
+  const epUrl = {}; let epPrefetching = null;
+  function prefetchEncore() {
+    if (epPrefetching || !EP) return epPrefetching;
+    if (LOCAL_FILE) return (epPrefetching = Promise.resolve());
+    const list = [EP.then.src, EP.now.src, EP.after.poster, EP.message.src, EP.after.src, EP.song].filter(Boolean);
+    epPrefetching = (async () => { for (const src of list) { const u = await grab(src); if (u) epUrl[src] = u; } })();
+    return epPrefetching;
+  }
+  const epSrc = (src) => epUrl[src] || src;
+
+  /* --- the scene --- */
+  const L = (id) => $("#" + id);
+  const layers = ["ep-title", "ep-tn", "ep-inf", "ep-msg", "ep-credits", "ep-standout", "ep-tbc", "ep-after", "ep-final"];
+  let epRun = 0, epMusic = null;
+  const msgV = $("#ep-msg-video"), afterV = $("#ep-after-video");
+
+  function epAlign() {
+    // lay out Then → Now so both photos share the same face positions
+    const vw = innerWidth, vh = innerHeight;
+    const Fh = Math.min(vh * 0.72, vw * 0.9 * 16 / 9), Fw = Fh * 9 / 16;
+    const Lf = (vw - Fw) / 2, Tf = (vh - Fh) / 2 - vh * 0.03;
+    const thenImg = $("#ep-then"), nowImg = $("#ep-now");
+    Object.assign(thenImg.style, { left: Lf + "px", top: Tf + "px", width: Fw + "px", height: Fh + "px" });
+    const W = nowImg.naturalWidth || 1200, H = nowImg.naturalHeight || 1600;
+    const [a1, a2] = EP.then.faces, [b1, b2] = EP.now.faces;
+    const P1 = [Lf + a1[0] * Fw, Tf + a1[1] * Fh], P2 = [Lf + a2[0] * Fw, Tf + a2[1] * Fh];
+    const Q1 = [b1[0] * W, b1[1] * H], Q2 = [b2[0] * W, b2[1] * H];
+    const s = Math.hypot(P2[0] - P1[0], P2[1] - P1[1]) / Math.hypot(Q2[0] - Q1[0], Q2[1] - Q1[1]);
+    const mx = (P1[0] + P2[0]) / 2, my = (P1[1] + P2[1]) / 2, qx = (Q1[0] + Q2[0]) / 2, qy = (Q1[1] + Q2[1]) / 2;
+    const aligned = `translate(${mx - qx * s}px, ${my - qy * s}px) scale(${s})`;
+    // final framing leaves room above for "Look how far we've come." and below for the year
+    const e = Math.min((vw * 0.9) / W, (vh * 0.6) / H);
+    const fit = `translate(${(vw - W * e) / 2}px, ${vh * 0.5 - (H * e) / 2}px) scale(${e})`;
+    Object.assign(nowImg.style, { width: W + "px", height: H + "px" });
+    $("#ep-tn-wrap").style.transformOrigin = `${mx}px ${my}px`;
+    return { aligned, fit };
+  }
+  function rollYear(elm, to) {
+    const from = elm.textContent;
+    elm.innerHTML = [...to].map((d, i) => d === from[i] ? `<b>${d}</b>` : `<b class="roll"><i>${from[i] || ""}</i><i>${d}</i></b>`).join("");
+  }
+  function duck(on) {
+    if (!epMusic) return;
+    if (canSetVolume) fadeTo(epMusic, on ? (EP.duckTo ?? 0.04) : (EP.musicVolume ?? 0.9), on ? 1800 : 2600);
+    else if (on) epMusic.pause(); else epMusic.play().catch(() => {});
+  }
+  function swell(level, ms) { if (epMusic && canSetVolume) fadeTo(epMusic, level, ms); }
+
+  function resetScene() {
+    layers.forEach((id) => L(id).classList.remove("on"));
+    ["ep-tn", "ep-inf", "ep-credits", "ep-after", "ep-msg"].forEach((id) => L(id).className = "ep-layer " + id);
+    msgV.pause(); afterV.pause();
+    $("#ep-msg-play").hidden = true;
+    $("#ep-now").style.transition = "none"; $("#ep-now").style.opacity = ""; $("#ep-tn-wrap").style.transition = "none"; $("#ep-tn-wrap").style.transform = "";
+  }
+
+  async function playEpilogue() {
+    const run = ++epRun;
+    const w = (ms) => new Promise((res, rej) => setTimeout(() => (run === epRun ? res() : rej(new Error("stop"))), ms));
+    const alive = () => { if (run !== epRun) throw new Error("stop"); };
+    const on = (id) => L(id).classList.add("on"), off = (id) => L(id).classList.remove("on");
+    resetScene();
+    try {
+      // music: in from the configured point; loops for the whole scene
+      epMusic = playSong(epSrc(EP.song), true, toSec(EP.songStart));
+      if (epMusic && canSetVolume) setTimeout(() => swell(EP.musicVolume ?? 0.9, 1500), 2300);
+
+      // 1. title
+      await w(1400); on("ep-title"); await w(4600); off("ep-title"); await w(1600);
+
+      // 2–3. Then → Now
+      const nowImg = $("#ep-now");
+      if (!nowImg.complete) await new Promise((r) => { nowImg.onload = nowImg.onerror = r; setTimeout(r, 4000); }); alive();
+      const pos = epAlign();
+      nowImg.style.transform = pos.aligned; void nowImg.offsetWidth;
+      nowImg.style.transition = "opacity 3.2s ease";
+      $("#ep-year").textContent = EP.then.year; $("#ep-tag").textContent = EP.then.label;
+      on("ep-tn"); await w(1600);
+      L("ep-tn").classList.add("push");                                   // slow push-in on the 2017 photo
+      $("#ep-tn-wrap").style.transition = "transform 9s linear"; $("#ep-tn-wrap").style.transform = "scale(1.07)";
+      await w(4200);
+      L("ep-tn").classList.add("dissolve");                               // match dissolve into now
+      rollYear($("#ep-year"), EP.now.year); $("#ep-tag").textContent = EP.now.label;
+      await w(3300);
+      nowImg.style.transition = "opacity 3.2s ease, transform 5s cubic-bezier(.45,0,.2,1)"; nowImg.style.transform = pos.fit;   // pull back to reveal all of now
+      $("#ep-tn-wrap").style.transition = "transform 5s cubic-bezier(.45,0,.2,1)"; $("#ep-tn-wrap").style.transform = "scale(1)";
+      L("ep-tn").classList.add("settled");
+      await w(3000); L("ep-tn").classList.add("far"); await w(6000);
+      off("ep-tn"); await w(1800);
+
+      // 4. 8 → ∞
+      on("ep-inf"); await w(2800);
+      L("ep-inf").classList.add("tilt"); await w(2200);
+      L("ep-inf").classList.add("b"); await w(4200);
+      off("ep-inf"); await w(1600);
+
+      // 5. your recorded video — the song dips to almost nothing
+      msgV.src = epSrc(EP.message.src); msgV.muted = false; msgV.currentTime = 0;
+      duck(true);
+      on("ep-msg"); await w(900);
+      const ended = new Promise((r) => { msgV.onended = r; });
+      try { await msgV.play(); } catch (e) { $("#ep-msg-play").hidden = false; await new Promise((r) => { $("#ep-msg-play").onclick = () => { $("#ep-msg-play").hidden = true; msgV.play().catch(() => {}); r(); }; }); }
+      alive();
+      await Promise.race([ended, new Promise((_, rej) => { const iv = setInterval(() => { if (run !== epRun) { clearInterval(iv); rej(new Error("stop")); } }, 300); ended.then(() => clearInterval(iv)); })]);
+      await w(1800);                                                      // hold on your last frame a moment…
+      off("ep-msg"); await w(2600);                                       // …then a quiet, dark pause to let it sink in
+      duck(false); swell((EP.musicVolume ?? 0.9) * 0.6, 3000);            // the song returns, gently
+      await w(1200);
+
+      // 6. credits, then the standout line on its own
+      on("ep-credits"); const roll = $("#ep-roll");
+      const dist = roll.offsetHeight + innerHeight;
+      roll.style.transition = "none"; roll.style.transform = `translateY(${innerHeight}px)`; void roll.offsetWidth;
+      roll.style.transition = `transform ${EP.creditsSeconds || 30}s linear`; roll.style.transform = `translateY(${innerHeight - dist}px)`;
+      await w((EP.creditsSeconds || 30) * 1000);
+      off("ep-credits"); on("ep-standout"); await w(7500); off("ep-standout"); await w(1800);
+
+      // 7. To Be Continued…
+      on("ep-tbc"); await w(7000); off("ep-tbc"); await w(3000);
+
+      // 8. after-credits: "wait… one more scene" → she taps → the clip, with the song swelling over it
+      on("ep-after"); await w(1400); L("ep-after").classList.add("card");
+      afterV.src = epSrc(EP.after.src);
+      await new Promise((r) => { $("#ep-after-card").onclick = () => r(); }); alive();
+      L("ep-after").classList.add("playing");
+      swell(1, 2500);
+      const done = new Promise((r) => { afterV.onended = r; });
+      afterV.currentTime = 0; afterV.play().catch(() => {});
+      await done; alive(); await w(1500);
+      off("ep-after"); await w(1600);
+
+      // 9. the end
+      swell(EP.musicVolume ?? 0.9, 2000);
+      on("ep-final");
+    } catch (e) { /* left the scene, or "play again" */ }
+  }
+
+  function enterEncore() {
+    if (homeTrack) { homeTrack.onended = null; homeTrack = null; }
+    // prime the videos with this tap so phones let them play later (with sound for your message)
+    msgV.src = epSrc(EP.message.src); msgV.poster = EP.message.poster || "";
+    msgV.muted = true; const p = msgV.play(); if (p) p.then(() => { msgV.pause(); msgV.muted = false; }).catch(() => { msgV.muted = false; });
+    afterV.src = epSrc(EP.after.src);
+    $("#ep-after-poster").src = epSrc(EP.after.poster);
+    $("#ep-then").src = epSrc(EP.then.src); $("#ep-now").src = epSrc(EP.now.src);
+    park(bg); Object.values(songCache).forEach((x) => { if (x.getAttribute("src") !== epSrc(EP.song)) park(x); });
+    prefetchEncore();
+    playEpilogue();
+  }
+  function leaveEncore() {
+    epRun++;
+    // the song keeps playing on the home screen (no more looping); when it ends, bg.mp3 takes over
+    if (epMusic && audio === epMusic && !epMusic.paused) {
+      const t = epMusic; t.loop = false; homeTrack = t; audio = null;
+      t.onended = () => { if (homeTrack === t) { homeTrack = null; t.onended = null; bgResume(); } };
+    }
+    resetScene();
+  }
+
+  if (EP) {
+    $("#ep-title-eyebrow").textContent = EP.titleEyebrow || "";
+    $("#ep-title-text").textContent = EP.title || "";
+    $("#ep-far").textContent = EP.farLine || "";
+    $("#ep-inf-a").textContent = EP.infA || ""; $("#ep-inf-b").textContent = EP.infB || "";
+    $("#ep-roll").innerHTML = (EP.credits || []).map(([r, n]) => `<div class="cr"><span class="cr-role">${esc(r)}</span><span class="cr-name">${esc(n)}</span></div>`).join("");
+    $("#ep-standout-text").textContent = EP.standout || "";
+    $("#ep-tbc-title").textContent = (EP.tbc || {}).title || ""; $("#ep-tbc-line").textContent = (EP.tbc || {}).line || ""; $("#ep-tbc-foot").textContent = (EP.tbc || {}).foot || "";
+    $("#ep-wait").textContent = EP.afterLine || "";
+    $("#ep-final-line").textContent = EP.finalLine || "";
+    $("#ep-again").addEventListener("click", () => { playEpilogue(); });
+    $("#ep-home").addEventListener("click", () => { location.hash = ""; route(); });
+    msgV.addEventListener("timeupdate", () => { if (msgV.duration) $("#ep-msg-bar").style.width = (msgV.currentTime / msgV.duration) * 100 + "%"; });
+    msgV.addEventListener("click", () => { msgV.paused ? msgV.play().catch(() => {}) : msgV.pause(); });   // tap to pause / resume
+    tickEncore(); setInterval(tickEncore, 1000);
+  }
 
   route();
 })();

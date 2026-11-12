@@ -57,6 +57,23 @@
       <div class="archive-row" id="archive-row"></div>
     </section>
 
+    <!-- ONE MORE THING: appears once all archives are unlocked; opens at 11:55 PM -->
+    <section class="encore" id="encore" hidden>
+      <p class="enc-eyebrow" id="enc-eyebrow"></p>
+      <h2 class="enc-title" id="enc-title"></h2>
+      <p class="enc-sub" id="enc-sub"></p>
+      <div class="enc-card" id="enc-card">
+        <div class="enc-locked">
+          <span class="enc-lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg></span>
+          <p class="enc-what" id="enc-what"></p>
+          <span class="enc-pill" id="enc-pill"></span>
+          <p class="enc-when"><span id="enc-date"></span> · <span id="enc-count"></span></p>
+        </div>
+        <div class="enc-reveal" aria-live="polite"><p class="enc-r1"></p><p class="enc-r2"></p></div>
+        <button class="enc-open" id="enc-open" type="button"><span aria-hidden="true">▶</span> <span id="enc-begin"></span></button>
+      </div>
+    </section>
+
     <p class="home-foot">turn your sound on ♪</p>
   </main>
 
@@ -144,6 +161,44 @@
           <figure class="polaroid p3-first" hidden><img id="p3-img2" alt="Us"></figure>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ ONE MORE THING (epilogue) ============ -->
+  <section class="scene scene-encore" id="scene-3" hidden>
+    <button class="back" type="button" aria-label="Back to the site">← back</button>
+    <div class="ep-layer ep-title" id="ep-title"><p class="eyebrow" id="ep-title-eyebrow"></p><h2 id="ep-title-text"></h2></div>
+    <div class="ep-layer ep-tn" id="ep-tn">
+      <div class="ep-tn-wrap" id="ep-tn-wrap"><img class="ep-then" id="ep-then" alt=""><img class="ep-now" id="ep-now" alt=""></div>
+      <div class="ep-tn-cap"><span class="ep-year" id="ep-year"></span><span class="ep-tag" id="ep-tag"></span></div>
+      <p class="ep-far" id="ep-far"></p>
+    </div>
+    <div class="ep-layer ep-inf" id="ep-inf">
+      <div class="ep-glyphs"><span class="g8">8</span><span class="ginf">∞</span></div>
+      <p class="ep-inf-a" id="ep-inf-a"></p><p class="ep-inf-b" id="ep-inf-b"></p>
+    </div>
+    <div class="ep-layer ep-msg" id="ep-msg">
+      <video id="ep-msg-video" playsinline preload="auto"></video>
+      <button class="ghost ep-tap" id="ep-msg-play" type="button" hidden>▶ play</button>
+      <div class="ep-msg-bar"><span id="ep-msg-bar"></span></div>
+    </div>
+    <div class="ep-layer ep-credits" id="ep-credits"><div class="ep-roll" id="ep-roll"></div></div>
+    <div class="ep-layer ep-standout" id="ep-standout"><p id="ep-standout-text"></p></div>
+    <div class="ep-layer ep-tbc" id="ep-tbc">
+      <div class="ep-tbc-card"><h3 id="ep-tbc-title"></h3><p id="ep-tbc-line"></p><span class="ep-tbc-inf">∞</span><p class="ep-tbc-foot" id="ep-tbc-foot"></p></div>
+    </div>
+    <div class="ep-layer ep-after" id="ep-after">
+      <p class="ep-wait" id="ep-wait"></p>
+      <button class="ep-after-card" id="ep-after-card" type="button" aria-label="Play the last scene">
+        <img id="ep-after-poster" alt="">
+        <span class="ep-after-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+        <span class="ep-after-tap">tap to play</span>
+      </button>
+      <video id="ep-after-video" muted playsinline preload="auto"></video>
+    </div>
+    <div class="ep-layer ep-final" id="ep-final">
+      <span class="ep-final-inf">∞</span><p id="ep-final-line"></p>
+      <div class="ep-final-btns"><button class="ghost" id="ep-again" type="button">play again</button><button class="ghost" id="ep-home" type="button">back to the site</button></div>
     </div>
   </section>
 

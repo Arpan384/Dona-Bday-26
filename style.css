@@ -642,3 +642,17 @@ body.bonus .home-bg { opacity: 1; animation: bonusDrift 40s ease-in-out infinite
 
 /* the bonus background stops drifting while a part is open (it's hidden behind it anyway) */
 body.in-part .home-bg { animation-play-state: paused; visibility: hidden; }
+
+/* ================= smoother film on phones ================= */
+/* blurred backdrop: blur a small copy and scale it up (looks the same, a fraction of the work) */
+.slide-bg { inset: auto; left: 50%; top: 50%; width: 22%; height: 22%; transform: translate(-50%, -50%) scale(5.4); filter: blur(7px) brightness(.42) saturate(1.15); }
+.slide-bg.vid-bg { left: 0; top: 0; width: 100%; height: 100%; transform: none; filter: none; }
+/* the page-wide film grain isn't needed over the film itself */
+body.in-film .grain { display: none; }
+/* a photo that's still arriving fades in once it's fully ready, instead of drawing top-to-bottom */
+.slide .frame { transition: opacity .6s ease; }
+.slide.waiting .frame { opacity: 0; }
+
+/* Part II: if a phone won't autoplay a clip (e.g. Low Power Mode), it becomes a gently moving still */
+.slide.video.still.on .slide-fg { animation: m-in var(--dur, 6s) linear both; }
+.film-skip { margin-top: 14px; font-size: 11px; padding: 8px 16px; opacity: 0; animation: fadeUp .8s ease forwards; }

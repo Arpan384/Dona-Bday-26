@@ -55,11 +55,30 @@
   const songCache = {};
   function getSong(src) {
     if (!songCache[src]) { const a = new Audio(); a.preload = "auto"; a.src = src; songCache[src] = a; }
+    unpark(songCache[src]);
     return songCache[src];
   }
-  // start downloading the songs of parts that are open (or opening within 30 min)
+  // "Parking" stops a song from downloading (so the film's photos and clips get the whole connection)
+  // and remembers where it was; unparking picks it back up.
+  function park(a) {
+    if (!a || a._parked || !a.src) return;
+    a._parked = { src: a.getAttribute("src"), at: a.currentTime || 0 };
+    a.pause(); a.removeAttribute("src"); a.load();
+  }
+  function unpark(a) {
+    if (!a || !a._parked) return;
+    const { src, at } = a._parked; a._parked = null;
+    a.src = src;
+    if (at) a.addEventListener("loadedmetadata", () => { try { a.currentTime = at; } catch (e) {} }, { once: true });
+  }
+  // start downloading the songs of parts that are open (or opening within 30 min) — only while she's on the home screen
   function warmSongs() {
-    C.parts.forEach((p) => { if (p.song && now() >= unlockAt(p) - 30 * 60e3) getSong(p.song); });
+    if (typeof current !== "undefined" && current >= 0) return;
+    C.parts.forEach((p, i) => {
+      if (!p.song || now() < unlockAt(p) - 30 * 60e3) return;
+      if (i === 1) preloadFilm();          // Part II: the whole film (song, photos, clips) is downloaded ahead
+      else getSong(p.song);
+    });
   }
 
   function playSong(src, loop, start = 0) {
@@ -103,6 +122,7 @@
   // resumes from where it was paused
   function bgResume() {
     if (!bg || bgMuted || !unlockedAudio || current >= 0 || playerOpen) return;
+    unpark(bg);
     bg.play().then(() => bgFade(BG.volume != null ? BG.volume : 0.7, 1800)).catch(() => {});
   }
   function bgPause(ms = 700) { if (bg && !bg.paused) bgFade(0, ms, () => bg.pause()); }
@@ -578,7 +598,8 @@
     current = idx;
     $("#home").hidden = idx >= 0;
     document.body.style.overflow = idx >= 0 ? "hidden" : "";
-    document.body.classList.toggle("in-part", idx >= 0);   // lets the home background rest while a part is open
+    document.body.classList.toggle("in-part", idx >= 0);
+    document.body.classList.toggle("in-film", idx === 1);   // lets the home background rest while a part is open
     if (idx >= 0) { bgPause(); scenes[idx].hidden = false; scenes[idx].scrollTop = 0; enter[idx](); }
     else { stopSong(); setTimeout(bgResume, 500); }
     soundBtn.hidden = !bg || idx >= 0;
@@ -777,14 +798,106 @@
   const clipLen = (m) => Math.max(1, (m.to != null ? m.to : (m.from || 0) + 4) - (m.from || 0));
 
   /* ---- caches so the next photos / clips are ready before they're needed ---- */
-  const imgCache = {}, vidCache = {};
-  const loadImg = (src) => imgCache[src] || (imgCache[src] = Object.assign(new Image(), { decoding: "async", src }));
+  const imgCache = {}, vidCache = {}, ready = {}, blobUrl = {};
+  const loadImg = (src) => imgCache[src] || (imgCache[src] = Object.assign(new Image(), { decoding: "async", src: blobUrl[src] || src }));
+  const localSrc = (src) => blobUrl[src] || src;
+
+  /* ---- download the WHOLE film before it plays, so nothing depends on the network mid-film ----
+     Starts quietly 30 min before Part II unlocks (while the site is open on the home screen),
+     or when she opens Part II. The opening card shows the progress and starts at 100%. */
+  const FILM = { started: false, done: 0, total: 1, finished: false, songUrl: null, promise: null, list: [], got: [], t0: 0, count: 0 };
+  function filmList() {
+    const seen = new Set();
+    return P2.media.filter((m) => !m.off).map((m) => ({ type: isVid(m) ? "video" : "photo", src: mediaSrc(m) }))
+      .filter((x) => !seen.has(x.src) && seen.add(x.src));
+  }
+  async function grab(src) {
+    for (let attempt = 0; attempt < 3; attempt++) {           // a couple of retries for a flaky connection
+      try { const r = await fetch(src); if (r.ok) return URL.createObjectURL(await r.blob()); } catch (e) {}
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+    return null;
+  }
+  // Opened straight from the computer (file://)? Browsers block downloading files there, so skip the
+  // full download and play directly from the files (they're on the disk anyway, so there's nothing to wait for).
+  const LOCAL_FILE = location.protocol === "file:";
+  function preloadFilm() {
+    if (FILM.promise) return FILM.promise;
+    if (LOCAL_FILE) { FILM.started = FILM.finished = true; return (FILM.promise = Promise.resolve()); }
+    FILM.started = true;
+    const list = filmList(), song = C.parts[1].song, SONG_W = 12;   // the song counts like 12 photos in the progress
+    FILM.list = list; FILM.got = list.map(() => false); FILM.t0 = performance.now();
+    FILM.total = list.length + (song ? SONG_W : 0);
+    const bump = (w) => { FILM.done += w; updateFilmProgress(); };
+    // if the song can't be downloaded ahead, don't wait for it — it simply streams as usual
+    const songP = song ? grab(song).then((u) => { FILM.songUrl = u; if (!u) FILM.songFailed = true; bump(SONG_W); }) : Promise.resolve();
+    let i = 0;
+    const worker = async () => {
+      while (i < list.length) {
+        const n = i++, it = list[n];
+        if (!blobUrl[it.src]) { const u = await grab(it.src); if (u) { blobUrl[it.src] = u; if (it.type === "video") ready[it.src] = Promise.resolve(); } }
+        FILM.got[n] = true; FILM.count++;
+        bump(1);
+      }
+    };
+    // the song gets most of the connection first (the film can't start without it); a second lane joins once it's in
+    FILM.promise = Promise.all([songP, worker(), songP.then(worker)]).then(() => { FILM.finished = true; updateFilmProgress(); });
+    return FILM.promise;
+  }
+  // Safe to start before 100%? Only if, at the measured download speed, every remaining photo/clip
+  // will arrive well before its moment in the film (like a video player's "enough buffered").
+  function filmCanStart() {
+    if (FILM.finished) return true;
+    if (C.parts[1].song && !FILM.songUrl && !FILM.songFailed) return false;
+    const secs = (performance.now() - FILM.t0) / 1000;
+    if (secs < 4 || FILM.count < 4) return false;
+    const rate = FILM.count / secs;                                    // items per second
+    const when = {}; items.forEach((x) => { if ((x.type === "photo" || x.type === "video") && when[x.src] == null) when[x.src] = x.t0; });
+    let prefix = FILM.got.indexOf(false); if (prefix < 0) return true;
+    for (let j = prefix; j < FILM.list.length; j++) {
+      const needAt = when[FILM.list[j].src]; if (needAt == null) continue;
+      const arrivesIn = (j - prefix + 1) / rate;                       // rough: the downloader keeps going in film order
+      if (arrivesIn > needAt - 6) return false;                        // keep a 6-second safety margin
+    }
+    return true;
+  }
+  function updateFilmProgress() {
+    const l = $("#film-loading");
+    if (l && !l.classList.contains("done")) l.textContent = `getting our story ready… ${Math.min(100, Math.round((FILM.done / FILM.total) * 100))}%`;
+  }
+  // Fetch the next few photos/clips in the order they'll appear, two at a time, so the nearest one is always first.
+  // Clips are downloaded completely (as a blob) so they play instantly — phones otherwise only fetch a sliver ahead.
+  let queue = [], active = 0;
+  function fetchMedia(it) {
+    if (ready[it.src]) return ready[it.src];
+    if (it.type === "photo") {
+      const im = loadImg(it.src);
+      ready[it.src] = (im.decode ? im.decode() : new Promise((r, j) => { im.onload = r; im.onerror = j; })).catch(() => {});
+    } else {
+      ready[it.src] = (blobUrl[it.src] || LOCAL_FILE) ? Promise.resolve()
+        : fetch(it.src).then((r) => r.ok ? r.blob() : null).then((b) => { if (b) blobUrl[it.src] = URL.createObjectURL(b); }).catch(() => {});
+    }
+    return ready[it.src];
+  }
+  function pump() {
+    while (active < 2 && queue.length) {
+      const it = queue.shift(); active++;
+      fetchMedia(it).finally(() => { active--; pump(); });
+    }
+  }
+  function prefetchFrom(k, ahead = 12) {
+    queue = items.slice(k + 1, k + 1 + ahead).filter((x) => (x.type === "photo" || x.type === "video") && !ready[x.src]);
+    pump();
+  }
   function loadVid(it) {
-    if (vidCache[it.src]) return vidCache[it.src];
+    if (vidCache[it.src]) {
+      if (blobUrl[it.src] && !vidCache[it.src].src.startsWith("blob:")) vidCache[it.src].src = blobUrl[it.src];
+      return vidCache[it.src];
+    }
     const v = document.createElement("video");
     Object.assign(v, { muted: true, playsInline: true, preload: "auto" });
     v.setAttribute("playsinline", ""); v.setAttribute("muted", "");
-    v.src = it.src;
+    v.src = blobUrl[it.src] || it.src;
     v.addEventListener("loadedmetadata", () => { try { v.currentTime = it.from; } catch (e) {} }, { once: true });
     return (vidCache[it.src] = v);
   }
@@ -867,7 +980,9 @@
 
   function layoutPhoto(s, img, it) {
     const ar = img.naturalWidth / img.naturalHeight, vr = innerWidth / innerHeight, r = ar / vr;
-    const cover = r > 0.8 && r < 1.25;               // photo's shape matches the screen → fill it
+    // fill the screen edge-to-edge only for a landscape photo on a landscape screen with nearly the same shape;
+    // on phones every photo stays whole and framed (filling a tall screen crops faces and hides captions)
+    const cover = vr > 1 && ar > 1 && r > 0.8 && r < 1.25;
     const polaroid = !cover && vr > 1.1 && it.n % 4 === 2;  // now and then on wide screens: a polaroid
     s.classList.toggle("cover", cover);
     s.classList.toggle("framed", !cover);
@@ -883,22 +998,27 @@
       s.classList.add("photo", "t-" + it.tr, "m-" + it.mo);
       s.style.setProperty("--dur", it.d + 1.6 + "s");
       s.style.setProperty("--tilt", it.tilt + "deg");
-      s.appendChild(Object.assign(el("div", "slide-bg"), { style: `background-image:url('${it.src}')` }));
+      s.appendChild(Object.assign(el("div", "slide-bg"), { style: `background-image:url('${localSrc(it.src)}')` }));
       const img = loadImg(it.src);
       const fig = el("figure", "frame");
-      const view = Object.assign(el("img", "slide-fg"), { src: it.src, alt: it.caption || "" });
+      const view = Object.assign(el("img", "slide-fg"), { src: localSrc(it.src), alt: it.caption || "" });
       fig.appendChild(view);
+      if (!(img.complete && img.naturalWidth)) {
+        // not ready yet: stay hidden, choose the layout once its real size is known, then fade in (no jump)
+        s.classList.add("waiting");
+        fetchMedia(it).then(() => { if (img.naturalWidth) layoutPhoto(s, img, it); s.classList.remove("waiting"); });
+      }
       if (it.caption) fig.appendChild(el("figcaption", "pol-cap", esc(it.caption)));
       const inner = el("div", "slide-inner"); inner.appendChild(fig); s.appendChild(inner);
       s.classList.add("framed");
       if (img.complete && img.naturalWidth) layoutPhoto(s, img, it);
-      else img.addEventListener("load", () => layoutPhoto(s, img, it), { once: true });
     } else if (it.type === "video") {
       s.classList.add("video", "t-" + it.tr);
+      s.style.setProperty("--dur", it.d + 1.6 + "s");
       s.appendChild(el("div", "slide-bg vid-bg"));
       const v = loadVid(it); v.className = "slide-fg";
       const inner = el("div", "slide-inner"); inner.appendChild(v); s.appendChild(inner);
-      const go = () => { try { v.currentTime = it.from; } catch (e) {} if (playing) v.play().catch(() => {}); };
+      const go = () => { try { v.currentTime = it.from; } catch (e) {} if (playing) v.play().catch(() => s.classList.add("still")); };
       v.readyState >= 1 ? go() : v.addEventListener("loadedmetadata", go, { once: true });
       v.ontimeupdate = () => { if (v.currentTime >= it.to - 0.05) v.pause(); };
       curVideo = v;
@@ -927,8 +1047,7 @@
     old.forEach((o) => o.classList.add("leaving")); // captions & year label leave immediately
     setTimeout(() => old.forEach((o) => o.remove()), 1500);
     // get the next few ready
-    items.slice(k + 1, k + 6).forEach((n) => { if (n.type === "photo") loadImg(n.src); });
-    items.slice(k + 1, k + 4).forEach((n) => { if (n.type === "video") loadVid(n); });
+    prefetchFrom(k);
   }
 
   const fmtT = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
@@ -965,7 +1084,8 @@
   // bokeh: a few soft lights drifting over the film
   (() => {
     const box = $("#film-bokeh");
-    for (let i = 0; i < 12; i++) {
+    const nB = innerWidth < 820 ? 6 : 12;
+    for (let i = 0; i < nB; i++) {
       const b = el("span");
       const size = 40 + Math.random() * 120;
       Object.assign(b.style, { width: size + "px", height: size + "px", left: Math.random() * 100 + "%", top: Math.random() * 100 + "%",
@@ -974,14 +1094,22 @@
     }
   })();
 
-  function whenReady(a) {
-    const first = items.filter((x) => x.type === "photo").slice(0, 3).map((x) => loadImg(x.src));
-    const imgsReady = Promise.all(first.map((im) => im.complete ? 1 : new Promise((r) => { im.onload = im.onerror = r; })));
-    const songReady = !a ? Promise.resolve() : a.readyState >= 3 ? Promise.resolve()
-      : new Promise((r) => { a.addEventListener("canplay", r, { once: true }); a.addEventListener("error", r, { once: true }); });
+  function whenReady() {
+    updateFilmProgress();
+    const all = preloadFilm();
     const minShow = new Promise((r) => setTimeout(r, 1800));      // let the opening card breathe
-    const cap = new Promise((r) => setTimeout(r, 7000));           // never wait longer than this
-    return Promise.race([Promise.all([imgsReady, songReady, minShow]), cap]);
+    // if it's taking long (very slow internet), offer to start anyway — it then streams like before
+    const skip = new Promise((r) => {
+      const t = setTimeout(() => {
+        const l = $("#film-loading"); if (!l || FILM.finished) return;
+        const b = el("button", "ghost film-skip", "start anyway ▸"); b.type = "button";
+        b.addEventListener("click", (e) => { e.stopPropagation(); b.remove(); r(); });
+        l.after(b);
+      }, 25000);
+      all.then(() => clearTimeout(t));
+    });
+    const enough = new Promise((r) => { const iv = setInterval(() => { if (filmCanStart()) { clearInterval(iv); r(); } }, 400); all.then(() => { clearInterval(iv); r(); }); });
+    return Promise.race([Promise.all([enough, minShow]), skip]).then(() => { const b = $(".film-skip"); if (b) b.remove(); prefetchFrom(-1); });
   }
 
   let enterToken = 0;
@@ -993,12 +1121,20 @@
     build(P2.songSeconds);
     playBtn.textContent = "❚❚";
     const src = C.parts[1].song, S = songStart(1);
-    const a = src ? getSong(src) : null;
-    if (a) { a.muted = true; const p = a.play(); if (p) p.then(() => { if (!started) a.pause(); a.muted = false; }).catch(() => { a.muted = false; }); }
+    let a = null;
+    if (src) {
+      a = songCache[src] || (songCache[src] = Object.assign(new Audio(), { preload: "auto" }));
+      a._parked = null;
+      // unlock this audio element with her tap (phones require that) using a silent sound, so the real song isn't downloaded twice
+      if (!a.getAttribute("src")) { a.src = FILM.songUrl || "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="; }
+      a.muted = true; const p = a.play(); if (p) p.then(() => { if (!started) a.pause(); a.muted = false; }).catch(() => { a.muted = false; });
+    }
+    park(bg); Object.values(songCache).forEach((x) => { if (x !== a) park(x); });   // the film gets the whole connection
     raf = requestAnimationFrame(frame);
-    whenReady(a).then(() => {
+    whenReady().then(() => {
       if (token !== enterToken || current !== 1) return;
       const loading = $("#film-loading"); if (loading) loading.classList.add("done");
+      if (a) { const want = FILM.songUrl || src; if (a.getAttribute("src") !== want) { a.pause(); a.src = want; } }
       const song = playSong(src, false, S);
       started = true; playing = true;
       const onMeta = () => {
@@ -1014,6 +1150,7 @@
   }
   function leaveTwo() {
     enterToken++;
+    queue = [];
     cancelAnimationFrame(raf); clearTimeout(idleTimer); playing = false; started = false;
     if (curVideo) { curVideo.pause(); curVideo = null; }
     stage.innerHTML = "";

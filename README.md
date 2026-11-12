@@ -31,5 +31,5 @@ A birthday site told in three parts, styled as movie posters. Each part unlocks 
 ## Trimmed clips & originals
 
 - `assets/clips/` now holds **trimmed** clips: just the part that plays, plus ½ s either side. In `config.js` each clip's `from`/`to` refers to the trimmed file, and `orig` notes the range in the original.
-- The untrimmed originals are kept in `assets/clips-full/`, and the original `part1.mp3` is in `assets/music-originals/`. Both folders are git-ignored, so they stay on your computer and are never deployed.
+- The untrimmed originals are kept in `assets/clips-full/`, the original `part1.mp3` is in `assets/music-originals/`, and full-size photos are in `assets/photos-full/` (the site uses lighter 1280px copies). All three folders are git-ignored, so they stay on your computer and are never deployed.
 - To use a different moment from a clip, re-trim it from `assets/clips-full/` with the new range (or ask Claude to).

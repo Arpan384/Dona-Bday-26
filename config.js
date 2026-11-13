@@ -70,12 +70,14 @@ window.BDAY = {
   /* ---------- PART I : the midnight message ---------- */
   part1: {
     eyebrow: "11:55 PM · five minutes early, because I couldn't wait",
-    title: "Happy Birthday, Dona",                           // ✏️
+    // title: "Happy Birthday, Dona",                           // ✏️
+    title: "Before the World Wishes You...",
     paragraphs: [                                            // ✏️ one string per paragraph
-      "Happy Birthday to my favorite person. ❤️",
+      // "Happy Birthday to my favorite person. ❤️",
+      "I know it's five minutes too early, but I couldn't possibly wait another minute to tell you how much you mean to me. ❤️",
       "I don't think you'll ever truly know how much you've changed my life.",
       "You walked into it so quietly, but somehow became the loudest part of my happiness.",
-      "We've had our share of disagreements, overthinking, distance, and moments where things felt difficult. But every challenge only reminded me of one thing-I never wanted a life that didn't have you in it.",
+      "We've had our share of disagreements, overthinking, distance, and moments where things felt difficult. But every challenge only reminded me of one thing — I never wanted a life that didn't have you in it.",
       "Thank you for staying. Thank you for understanding me, even when I couldn't explain myself. Thank you for making ordinary days feel special just by being there.",
       "My favorite thing about us isn't that we've had a perfect story. It's that we've continued writing it together, one day at a time.",
       "Today, I don't just wish you happiness. I wish you the kind of peace you bring into my life. I hope every dream you've kept in your heart finds its way to you, because no one deserves it more.",
@@ -228,6 +230,10 @@ window.BDAY = {
     // Once every video is unlocked, the home screen background changes to this — and stays that way.
     allUnlockedBackground: "assets/photos/bonus-poster.jpg",
 
+    // After she unlocks a video, her message shows with a "watch ▶" button that counts down, then the video plays.
+    // Leave autoPlaySeconds out (or 0) to time it by the message length (8–20 s); or set a number, e.g. 12.
+    autoPlaySeconds: 0,
+
     // secretTitle = what the card says until she unlocks it; then it shows the real title
     items: [
       {
@@ -295,6 +301,7 @@ window.BDAY = {
      Appears under the archives once all 5 are unlocked, and opens at the time below.
      Everything here plays as one continuous, full-screen scene. */
   epilogue: {
+    showAt: { dayOffset: 0, time: "23:32" },        // the card appears (locked) at 11:32 PM
     unlock: { dayOffset: 0, time: "23:55" },        // 11:55 PM on her birthday (and all 5 archives must be unlocked)
     song: "assets/music/bonus.mp3",
     songStart: "0:00",                              // ✏️ where the song begins, "m:ss"
@@ -317,7 +324,7 @@ window.BDAY = {
     title: "One More Thing…",
     // Then → Now: the two photos are lined up on your faces ([x, y] of her face, then his, as 0–1 of the photo)
     then: { src: "assets/epilogue/then.jpg", year: "2017", label: "then", faces: [[0.278, 0.294], [0.667, 0.194]] },
-    now:  { src: "assets/epilogue/now.jpg",  year: "2025", label: "now",  faces: [[0.463, 0.444], [0.572, 0.398]] },
+    now:  { src: "assets/epilogue/now.jpg",  year: "2026", label: "now",  faces: [[0.463, 0.444], [0.572, 0.398]] },
     farLine: "Look how far we've come.",
     infA: "8 years…",
     infB: "…and we're just getting started.",
@@ -353,6 +360,8 @@ window.BDAY = {
     tbc: { title: "To Be Continued…", line: "Our favourite chapters are still ahead of us.", foot: "The story isn't over" },
     afterLine: "wait… one more scene",
     after: { src: "assets/epilogue/after.mp4", poster: "assets/epilogue/after.jpg" },   // the after-credits clip (muted; the song plays over it)
+    afterCaption: "Mine. ❤️",                       // ✏️ fades in over the last moments of that clip ("" = none)
+    afterCaptionSeconds: 3.5,                       // how long before the clip ends it appears
     finalLine: "forever begins every day with you"
   },
 

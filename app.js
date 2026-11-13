@@ -137,9 +137,12 @@
   function bgPause(ms = 700) { [bg, homeTrack].forEach((a) => { if (a && !a.paused) bgFade(0, ms, () => a.pause(), a); }); }
   const soundBtn = $("#sound-toggle");
   soundBtn.hidden = true;                                 // appears with the music
+  function setBgMuted(v) {
+    bgMuted = v; soundBtn.classList.toggle("off", v);
+    soundBtn.setAttribute("aria-label", v ? "Play music" : "Mute music");
+  }
   soundBtn.addEventListener("click", () => {
-    bgMuted = !bgMuted; soundBtn.classList.toggle("off", bgMuted);
-    soundBtn.setAttribute("aria-label", bgMuted ? "Play music" : "Mute music");
+    setBgMuted(!bgMuted);
     bgMuted ? bgPause(400) : bgResume();
   });
 
@@ -423,7 +426,7 @@
     chCleanup = (games[it.lock.type] || gameQuestion)(it, (answer, details) => win(it, answer, details));
   }
   function closeChallenge() {
-    clearTimeout(winTimer);
+    clearInterval(winTimer);
     if (ch.hidden) return;
     if (chCleanup) { chCleanup(); chCleanup = null; }
     ch.classList.remove("on");
@@ -446,9 +449,18 @@
     const card = cards[it.id];
     if (AR.items.every((x) => !x.lock || isUnlocked(x.id))) bonusPending = true;
     paintCards(); if (card) { card.classList.add("just-unlocked"); setTimeout(() => card.classList.remove("just-unlocked"), 2000); }
-    // let the message be read, then play
-    winTimer = setTimeout(openIt, 6000);
-    function openIt() { clearTimeout(winTimer); closeChallenge(); setTimeout(() => openPlayer(it), 350); }
+    // let the message be read, then play — the button counts down so she knows it's coming (and can tap sooner).
+    // archive.autoPlaySeconds fixes the time; otherwise it depends on how long the message is (8–20 s).
+    const secs = AR.autoPlaySeconds || Math.round(Math.min(20, Math.max(8, 3 + [...(it.lock.after || "")].length / 14)));
+    go.classList.add("go-count"); go.style.setProperty("--secs", secs + "s");
+    go.innerHTML = `<span class="go-fill"></span><span class="go-txt">watch ▶ <b>${secs}</b></span>`;
+    let left = secs; const startAt = Date.now() + 1000;            // the button fades in first
+    winTimer = setInterval(() => {
+      const n = Math.max(0, secs - Math.floor((Date.now() - startAt) / 1000));
+      if (n !== left) { left = n; const b = go.querySelector("b"); if (b) b.textContent = n; }
+      if (Date.now() >= startAt + secs * 1000) openIt();
+    }, 200);
+    function openIt() { clearInterval(winTimer); closeChallenge(); setTimeout(() => openPlayer(it), 350); }
     go.addEventListener("click", openIt);
   }
 
@@ -1271,7 +1283,9 @@
   const EP = C.epilogue || null;
   const encoreSec = $("#encore");
   const allArchived = () => !!(AR && AR.items && AR.items.every((it) => !it.lock || isUnlocked(it.id)));
-  const encoreVisible = () => !!EP && (allArchived() || (PREVIEW && params.has("encore")));
+  // the card shows up (locked) at showAt — no longer tied to the archives — and opens at unlock
+  const encoreShowAt = () => EP.showAt ? unlockAt({ unlock: EP.showAt }) : unlockAt(EP);
+  const encoreVisible = () => !!EP && (now() >= encoreShowAt() || (PREVIEW && params.has("encore")));
   function encoreOpen() { return encoreVisible() && now() >= unlockAt(EP); }
   const SEEN = (TEST ? "bday-encore-test" : "bday-encore") + "-revealed";
   let encoreState = "";
@@ -1360,11 +1374,37 @@
     const from = elm.textContent;
     elm.innerHTML = [...to].map((d, i) => d === from[i] ? `<b>${d}</b>` : `<b class="roll"><i>${from[i] || ""}</i><i>${d}</i></b>`).join("");
   }
+  // While your message plays the song dips (laptops/Android) or is muted (iPhones can't change volume).
+  // It is never paused on purpose: a paused song may only be restarted by a tap on phones.
   function duck(on) {
     if (!epMusic) return;
-    if (canSetVolume) fadeTo(epMusic, on ? (EP.duckTo ?? 0.04) : (EP.musicVolume ?? 0.9), on ? 1800 : 2600);
-    else if (on) epMusic.pause(); else epMusic.play().catch(() => {});
+    if (on) {
+      if (canSetVolume) fadeTo(epMusic, EP.duckTo ?? 0.04, 1800);
+      else epMusic.muted = true;
+    } else {
+      epMusic.muted = false;
+      bringMusicBack();
+    }
   }
+  // Make sure the song is really playing again. If the phone paused it while your video had the
+  // speaker, try to restart it; if the browser wants a tap for that, the very next tap anywhere does it.
+  let epNeedTap = false;
+  function bringMusicBack(run = epRun) {
+    const a = epMusic;
+    if (!a || run !== epRun) return;
+    if (a !== audio) audio = a;
+    if (!a.paused) return;
+    const p = a.play();
+    if (p) p.then(() => { epNeedTap = false; musicBtn.style.display = "none"; }).catch(() => {
+      epNeedTap = true;
+      musicBtn.style.display = "block";
+      setTimeout(() => { if (epNeedTap && run === epRun && a.paused) bringMusicBack(run); }, 1500);   // keep trying quietly
+    });
+  }
+  // any tap during the scene counts as permission to resume the song
+  ["pointerdown", "touchend", "keydown"].forEach((t) => document.addEventListener(t, () => {
+    if (epNeedTap && epMusic && epMusic.paused && current === 3) bringMusicBack();
+  }, true));
   function swell(level, ms) { if (epMusic && canSetVolume) fadeTo(epMusic, level, ms); }
 
   function resetScene() {
@@ -1384,6 +1424,7 @@
     try {
       // music: in from the configured point; loops for the whole scene
       epMusic = playSong(epSrc(EP.song), true, toSec(EP.songStart));
+        if (epMusic) epMusic.muted = false;
       if (epMusic && canSetVolume) setTimeout(() => swell(EP.musicVolume ?? 0.9, 1500), 2300);
 
       // 1. title
@@ -1419,13 +1460,20 @@
       msgV.src = epSrc(EP.message.src); msgV.muted = false; msgV.currentTime = 0;
       duck(true);
       on("ep-msg"); await w(900);
-      const ended = new Promise((r) => { msgV.onended = r; });
+      const ended = new Promise((r) => {
+        msgV.onended = r;
+        msgV.ontimeupdate = () => { if (msgV.duration && msgV.currentTime >= msgV.duration - 0.25) { msgV.ontimeupdate = null; r(); } };
+      });
       try { await msgV.play(); } catch (e) { $("#ep-msg-play").hidden = false; await new Promise((r) => { $("#ep-msg-play").onclick = () => { $("#ep-msg-play").hidden = true; msgV.play().catch(() => {}); r(); }; }); }
       alive();
       await Promise.race([ended, new Promise((_, rej) => { const iv = setInterval(() => { if (run !== epRun) { clearInterval(iv); rej(new Error("stop")); } }, 300); ended.then(() => clearInterval(iv)); })]);
       await w(1800);                                                      // hold on your last frame a moment…
-      off("ep-msg"); await w(2600);                                       // …then a quiet, dark pause to let it sink in
-      duck(false); swell((EP.musicVolume ?? 0.9) * 0.6, 3000);            // the song returns, gently
+      off("ep-msg");
+      // …a quiet, dark pause to let it sink in, while the song comes back in underneath
+      if (canSetVolume && epMusic) epMusic.volume = Math.min(epMusic.volume, 0.02);
+      duck(false); swell((EP.musicVolume ?? 0.9) * 0.6, 3200);
+      await w(2600);
+      bringMusicBack();
       await w(1200);
 
       // 6. credits, then the standout line on its own
@@ -1444,6 +1492,10 @@
       afterV.src = epSrc(EP.after.src);
       await new Promise((r) => { $("#ep-after-card").onclick = () => r(); }); alive();
       L("ep-after").classList.add("playing");
+      // a quiet caption fades in for the last couple of seconds of the clip
+      $("#ep-mine").textContent = EP.afterCaption || "";
+      afterV.ontimeupdate = () => { if (EP.afterCaption && afterV.duration && afterV.currentTime >= afterV.duration - (EP.afterCaptionSeconds || 2.6)) { afterV.ontimeupdate = null; L("ep-after").classList.add("mine"); } };
+      if (epMusic) { epMusic.muted = false; if (epMusic.paused) epMusic.play().catch(() => {}); }
       swell(1, 2500);
       const done = new Promise((r) => { afterV.onended = r; });
       afterV.currentTime = 0; afterV.play().catch(() => {});
@@ -1469,10 +1521,12 @@
     playEpilogue();
   }
   function leaveEncore() {
-    epRun++;
+    epRun++; epNeedTap = false; musicBtn.style.display = "none";
     // the song keeps playing on the home screen (no more looping); when it ends, bg.mp3 takes over
     if (epMusic && audio === epMusic && !epMusic.paused) {
-      const t = epMusic; t.loop = false; homeTrack = t; audio = null;
+      const t = epMusic; t.loop = false; t.muted = false; homeTrack = t; audio = null;
+      setBgMuted(false);                                  // the song is playing, so the ♪ button must say so (even if she had muted bg.mp3 earlier)
+      if (canSetVolume && t.volume < 0.5) clearInterval(fadeTimer), bgFade(homeLevel(t), 1500, null, t);     // left during your message: bring it back up
       t.onended = () => { if (homeTrack === t) { homeTrack = null; t.onended = null; bgResume(); } };
     }
     resetScene();

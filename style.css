@@ -490,7 +490,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .home-bg::after { content: ""; position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(13,10,11,.55) 0%, rgba(13,10,11,.35) 35%, rgba(13,10,11,.8) 75%, rgba(13,10,11,.95) 100%); }
 body.bonus .home-bg { opacity: 1; }
-.home { position: relative; z-index: 1; }
+.home { position: relative; z-index: 1; overflow-x: clip; }   /* the marquee glow is wider than a phone: keep it from widening the page */
 body.bonus .marquee-title, body.bonus .marquee-sub, body.bonus .eyebrow, body.bonus .marquee-tag, body.bonus .studio, body.bonus .billing { text-shadow: 0 2px 18px rgba(0,0,0,.8); }
 .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 80; transform: translate(-50%, 20px); opacity: 0;
   background: rgba(20,13,15,.92); border: 1px solid rgba(217,178,111,.4); color: var(--gold-2); border-radius: 999px; padding: 12px 22px;
@@ -660,6 +660,9 @@ body.in-film .grain { display: none; }
 
 /* Part II: if a phone won't autoplay a clip (e.g. Low Power Mode), it becomes a gently moving still */
 .slide.video.still.on .slide-fg { animation: m-in var(--dur, 6s) linear both; }
+.film-tap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20; padding: 14px 28px; font-size: 13px;
+  background: rgba(13,10,11,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: fadeUp .6s ease both; }
+.film-tap[hidden] { display: none; }
 .film-skip { margin-top: 14px; font-size: 11px; padding: 8px 16px; opacity: 0; animation: fadeUp .8s ease forwards; }
 
 /* ================= ONE MORE THING: home card ================= */

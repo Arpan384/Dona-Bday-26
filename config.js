@@ -301,7 +301,7 @@ window.BDAY = {
      Appears under the archives once all 5 are unlocked, and opens at the time below.
      Everything here plays as one continuous, full-screen scene. */
   epilogue: {
-    showAt: { dayOffset: 0, time: "23:32" },        // the card appears (locked) at 11:32 PM
+    showAt: { dayOffset: 0, time: "23:40" },        // the card appears (locked) at 11:32 PM
     unlock: { dayOffset: 0, time: "23:55" },        // 11:55 PM on her birthday (and all 5 archives must be unlocked)
     song: "assets/music/bonus.mp3",
     songStart: "0:00",                              // ✏️ where the song begins, "m:ss"
@@ -370,6 +370,7 @@ window.BDAY = {
     firstPhoto: "assets/photos/new/unk-n10.jpg",   // shown first; at the final line the main photo drops on top of it
     photo: "assets/photos/2026-e-1.jpeg",
     lineSeconds: 5,            // how long each line stays on screen
+    photoEarlySeconds: 2.5,    // ✏️ the main photo drops in this many seconds before the final line
     lines: [                   // ✏️ one line per screen
       "Before Your Birthday Ends, I just want to tell you...",
       "I'm so Thankful for You.",

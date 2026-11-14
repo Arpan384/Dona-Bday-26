@@ -1117,6 +1117,11 @@
     if (useAudioClock && audio) {
       updateLyric(audio.currentTime);
       if (PREVIEW) timeEl.textContent = "song " + fmtT(audio.currentTime);
+      // the phone refused to start the song (iPhones sometimes do): hold the film and ask for one tap
+      if (started && playing && audio.paused && !audio.error) {
+        if (!filmStall) filmStall = ts;
+        else if (ts - filmStall > 900 && filmTap.hidden) { filmTap.hidden = false; musicBtn.style.display = "none"; if (curVideo) curVideo.pause(); }
+      } else { filmStall = 0; if (!filmTap.hidden) filmTap.hidden = true; }
     }
     raf = requestAnimationFrame(frame);
   }
@@ -1191,13 +1196,16 @@
       const loading = $("#film-loading"); if (loading) loading.classList.add("done");
       if (a) { const want = FILM.songUrl || src; if (a.getAttribute("src") !== want) { a.pause(); a.src = want; } }
       const song = playSong(src, false, S);
-      started = true; playing = true;
+      musicBtn.style.display = "none";
+      // the film always runs on the song's clock, so the pictures can never drift away from the music
+      useAudioClock = !!song;
+      started = true; playing = true; filmStall = 0;
       const onMeta = () => {
         if (isFinite(song.duration) && song.duration - S > 30) { build(song.duration - S); useAudioClock = true; idx = -1; /* show() keeps the current slide if it's unchanged */ }
       };
       if (song) {
         song.readyState >= 1 ? onMeta() : song.addEventListener("loadedmetadata", onMeta, { once: true });
-        song.addEventListener("error", () => { useAudioClock = false; }, { once: true });
+        song.addEventListener("error", () => { useAudioClock = false; filmTap.hidden = true; }, { once: true });
       }
       poke();
     });
@@ -1207,11 +1215,21 @@
     enterToken++;
     queue = [];
     cancelAnimationFrame(raf); clearTimeout(idleTimer); playing = false; started = false;
+    filmTap.hidden = true; filmStall = 0;
     if (curVideo) { curVideo.pause(); curVideo = null; }
     stage.innerHTML = "";
   }
 
   playBtn.addEventListener("click", (e) => { e.stopPropagation(); toggle(); });
+  let filmStall = 0;
+  const filmTap = el("button", "ghost film-tap", "▶ tap to play"); filmTap.type = "button"; filmTap.hidden = true;
+  filmScene.appendChild(filmTap);
+  filmTap.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!audio) return;
+    audio.muted = false;
+    audio.play().then(() => { filmTap.hidden = true; filmStall = 0; if (canSetVolume) fadeTo(audio, 1, 800); if (curVideo) curVideo.play().catch(() => {}); }).catch(() => {});
+  });
   $("#film-prev").addEventListener("click", (e) => { e.stopPropagation(); if (started) seek(items[Math.max(0, idx - 1)].t0 + 0.01); poke(); });
   $("#film-next").addEventListener("click", (e) => { e.stopPropagation(); if (started) seek(items[Math.min(items.length - 1, idx + 1)].t0 + 0.01); poke(); });
   filmScene.addEventListener("pointermove", poke);
@@ -1258,7 +1276,8 @@
     });
     // two photos: the first one shows during the message, the main one drops on top with the final line
     const pile = $("#p3-pile"); pile.classList.remove("swap");
-    if (P3.firstPhoto) reelTimers.push(setTimeout(() => pile.classList.add("swap"), 1200 + (lines.length - 1) * step));
+    const early = (P3.photoEarlySeconds ?? 2.5) * 1000;          // the main photo arrives a little before the final line
+    if (P3.firstPhoto) reelTimers.push(setTimeout(() => pile.classList.add("swap"), Math.max(1200, 1200 + (lines.length - 1) * step - early)));
     const endAt = 1200 + (lines.length - 1) * step + 1800;
     reelTimers.push(setTimeout(() => $("#p3-sign").classList.add("in"), endAt));
     reelTimers.push(setTimeout(() => ($("#reel-replay").hidden = false), endAt + 2500));
@@ -1527,7 +1546,8 @@
       const t = epMusic; t.loop = false; t.muted = false; homeTrack = t; audio = null;
       setBgMuted(false);                                  // the song is playing, so the ♪ button must say so (even if she had muted bg.mp3 earlier)
       if (canSetVolume && t.volume < 0.5) clearInterval(fadeTimer), bgFade(homeLevel(t), 1500, null, t);     // left during your message: bring it back up
-      t.onended = () => { if (homeTrack === t) { homeTrack = null; t.onended = null; bgResume(); } };
+      // like the end of a film: when it finishes, silence. The ♪ button shows muted; tapping it brings bg.mp3 back (looping as before).
+      t.onended = () => { if (homeTrack === t) { homeTrack = null; t.onended = null; setBgMuted(true); soundBtn.hidden = current >= 0 || !homeAudio(); } };
     }
     resetScene();
   }

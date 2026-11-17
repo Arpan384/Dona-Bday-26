@@ -704,6 +704,7 @@ body.bonus .encore { text-shadow: 0 2px 16px rgba(0,0,0,.8); }
 .ep-layer { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; opacity: 0; visibility: hidden;
   transition: opacity 1.6s ease, visibility 0s 1.6s; padding: 24px; }
 .ep-layer.on { opacity: 1; visibility: visible; transition: opacity 1.6s ease; }
+.ep-fast .ep-layer:not(.on) { transition: opacity .55s ease, visibility 0s .55s; }   /* restart / leave: clear the screen quickly */
 
 .ep-title .eyebrow { font-size: 12px; margin-bottom: 14px; }
 .ep-title h2 { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: clamp(44px, 8vw, 96px); margin: 0; }
@@ -794,6 +795,14 @@ body.bonus .encore { text-shadow: 0 2px 16px rgba(0,0,0,.8); }
 .ep-after.playing .ep-after-card, .ep-after.playing .ep-wait { opacity: 0; }
 
 /* the end */
+/* your note, before the final ∞: one line at a time */
+.ep-note-card { max-width: 680px; margin: 0 auto; padding: 0 28px; }
+.ep-note-line { font-family: var(--serif); font-style: italic; font-size: clamp(21px, 2.7vw, 30px); line-height: 1.5; color: var(--ink); margin: 0 0 16px;
+  opacity: 0; transform: translateY(10px); transition: opacity 1.8s ease, transform 2.4s cubic-bezier(.2,.7,.2,1); }
+.ep-note-line:last-of-type { color: #fbefd6; }
+.ep-note-sign { font-family: var(--serif); font-size: clamp(17px, 2vw, 21px); color: var(--gold-2); margin: 26px 0 0; letter-spacing: .04em;
+  opacity: 0; transition: opacity 1.6s ease; }
+.ep-note-line.in { opacity: 1; transform: none; } .ep-note-sign.in { opacity: 1; }
 .ep-final { align-content: center; gap: 6px; }
 .ep-final-inf { font-family: var(--serif); font-size: clamp(80px, 14vw, 140px); color: var(--gold-2); line-height: 1; text-shadow: 0 0 50px rgba(243,215,158,.25); }
 .ep-final p { font-family: var(--serif); font-style: italic; font-size: clamp(18px, 2.2vw, 24px); color: var(--muted); margin: 6px 0 22px; }

@@ -1364,7 +1364,7 @@
 
   /* --- the scene --- */
   const L = (id) => $("#" + id);
-  const layers = ["ep-title", "ep-tn", "ep-inf", "ep-msg", "ep-credits", "ep-standout", "ep-tbc", "ep-after", "ep-final"];
+  const layers = ["ep-title", "ep-tn", "ep-inf", "ep-msg", "ep-credits", "ep-standout", "ep-tbc", "ep-after", "ep-note", "ep-final"];
   let epRun = 0, epMusic = null;
   const msgV = $("#ep-msg-video"), afterV = $("#ep-after-video");
 
@@ -1427,6 +1427,7 @@
   function swell(level, ms) { if (epMusic && canSetVolume) fadeTo(epMusic, level, ms); }
 
   function resetScene() {
+    const sc = $("#scene-3"); sc.classList.add("ep-fast"); clearTimeout(resetScene.t); resetScene.t = setTimeout(() => sc.classList.remove("ep-fast"), 900);
     layers.forEach((id) => L(id).classList.remove("on"));
     ["ep-tn", "ep-inf", "ep-credits", "ep-after", "ep-msg"].forEach((id) => L(id).className = "ep-layer " + id);
     msgV.pause(); afterV.pause();
@@ -1519,16 +1520,28 @@
       const done = new Promise((r) => { afterV.onended = r; });
       afterV.currentTime = 0; afterV.play().catch(() => {});
       await done; alive(); await w(1500);
-      off("ep-after"); await w(1600);
+      off("ep-after"); swell(EP.musicVolume ?? 0.9, 2000); await w(1600);
 
-      // 9. the end
-      swell(EP.musicVolume ?? 0.9, 2000);
+      // 9. your note, one line at a time, then your name
+      const N = EP.note || {};
+      if (N.lines && N.lines.length) {
+        const ps = [...L("ep-note").querySelectorAll(".ep-note-line, .ep-note-sign")];
+        ps.forEach((p) => p.classList.remove("in"));
+        on("ep-note"); await w(900);
+        const per = (N.lineSeconds || 3) * 1000;
+        for (const p of ps) { p.classList.add("in"); await w(p.classList.contains("ep-note-sign") ? 1200 : per); }
+        await w((N.holdSeconds || 3.5) * 1000);
+        off("ep-note"); await w(1800);
+      }
+
+      // 10. the end
       on("ep-final");
     } catch (e) { /* left the scene, or "play again" */ }
   }
 
   function enterEncore() {
-    if (homeTrack) { homeTrack.onended = null; homeTrack = null; }
+    clearInterval(bgTimer);                       // the epilogue takes its song back: cancel the home screen's fade-out of it
+    if (homeTrack) { const t = homeTrack; t.onended = null; homeTrack = null; if (t.getAttribute("src") !== epSrc(EP.song)) t.pause(); }
     // prime the videos with this tap so phones let them play later (with sound for your message)
     msgV.src = epSrc(EP.message.src); msgV.poster = EP.message.poster || "";
     msgV.muted = true; const p = msgV.play(); if (p) p.then(() => { msgV.pause(); msgV.muted = false; }).catch(() => { msgV.muted = false; });
@@ -1559,6 +1572,7 @@
     $("#ep-inf-a").textContent = EP.infA || ""; $("#ep-inf-b").textContent = EP.infB || "";
     $("#ep-roll").innerHTML = (EP.credits || []).map(([r, n]) => `<div class="cr"><span class="cr-role">${esc(r)}</span><span class="cr-name">${esc(n)}</span></div>`).join("");
     $("#ep-standout-text").textContent = EP.standout || "";
+    $("#ep-note-card").innerHTML = ((EP.note || {}).lines || []).map((t) => `<p class="ep-note-line">${esc(t)}</p>`).join("") + ((EP.note || {}).sign ? `<p class="ep-note-sign">${esc(EP.note.sign)}</p>` : "");
     $("#ep-tbc-title").textContent = (EP.tbc || {}).title || ""; $("#ep-tbc-line").textContent = (EP.tbc || {}).line || ""; $("#ep-tbc-foot").textContent = (EP.tbc || {}).foot || "";
     $("#ep-wait").textContent = EP.afterLine || "";
     $("#ep-final-line").textContent = EP.finalLine || "";

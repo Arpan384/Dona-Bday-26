@@ -51,7 +51,7 @@ window.BDAY = {
       review: "Not one boring scene in eight years.",  // ✏️
       runtime: "4:25",
       poster: "assets/photos/2023-7.jpg",
-      unlock: { dayOffset: 0, time: "11:00" },     // 11:00 AM on her birthday
+      unlock: { dayOffset: 0, time: "11:55" },     // 11:00 AM on her birthday
       song: "assets/music/part2.mpeg",               // ✏️ the ~4:25 personalised song
       songStart: "0:00"   // ✏️ the film is timed from here to the end of the song
     },
@@ -306,7 +306,7 @@ window.BDAY = {
     song: "assets/music/bonus.mp3",
     songStart: "0:00",                              // ✏️ where the song begins, "m:ss"
     musicVolume: 0.9,                               // normal level
-    duckTo: 0.06,                                   // almost silent while your recorded video plays
+    duckTo: 0.08,                                   // almost silent while your recorded video plays
 
     // the card on the home screen
     card: {
@@ -362,6 +362,17 @@ window.BDAY = {
     after: { src: "assets/epilogue/after.mp4", poster: "assets/epilogue/after.jpg" },   // the after-credits clip (muted; the song plays over it)
     afterCaption: "Mine. ❤️",                       // ✏️ fades in over the last moments of that clip ("" = none)
     afterCaptionSeconds: 3.5,                       // how long before the clip ends it appears
+    // ✏️ your note: shown after the after-credits clip, one line at a time, just before the final ∞
+    note: {
+      lines: [
+        "Planning your birthday for a month was beautiful.",
+        "The week I spent putting this together was even more nostalgic.",
+        "But the most priceless part was today — my day with you.",
+      ],
+      sign: "— Appu",
+      lineSeconds: 3.2,       // time before the next line appears
+      holdSeconds: 4,         // how long it all stays once complete
+    },
     finalLine: "forever begins every day with you"
   },
 

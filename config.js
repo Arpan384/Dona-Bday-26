@@ -237,7 +237,7 @@ window.BDAY = {
     // secretTitle = what the card says until she unlocks it; then it shows the real title
     items: [
       {
-        id: "bday-2018", secretTitle: "A Little Something", title: "Birthday 2018",
+        id: "bday-2018", secretTitle: "A Little Something", title: "2018 - A Little Something",
         src: "assets/archive/bday-2018.mp4", poster: "assets/archive/bday-2018.jpg",
         lock: {
           type: "question", hint: "a question",
@@ -247,7 +247,7 @@ window.BDAY = {
         }
       },
       {
-        id: "bday-2019-a", secretTitle: "The Next Chapter", title: "Birthday 2019", note: "take one",
+        id: "bday-2019-a", secretTitle: "The Next Chapter", title: "2019 - The Next Chapter", note: "take one",
         src: "assets/archive/bday-2019-a.mp4", poster: "assets/archive/bday-2019-a.jpg",
         lock: {
           type: "unscramble", hint: "a little tune",
@@ -262,7 +262,7 @@ window.BDAY = {
         }
       },
       {
-        id: "bday-2019-b", secretTitle: "One More Take", title: "Birthday 2019", note: "take two",
+        id: "bday-2019-b", secretTitle: "One More Take", title: "2019 - One More Take", note: "take two",
         src: "assets/archive/bday-2019-b.mp4", poster: "assets/archive/bday-2019-b.jpg",
         lock: {
           type: "hearts", hint: "a little game",
@@ -273,7 +273,7 @@ window.BDAY = {
         }
       },
       {
-        id: "bday-2023", secretTitle: "A Special Screening", title: "Birthday 2023",
+        id: "bday-2023", secretTitle: "A Special Screening", title: "2023 - A Special Screening",
         src: "assets/archive/bday-2023.mp4", poster: "assets/archive/bday-2023.jpg",
         lock: {
           type: "question", hint: "a question",
@@ -283,7 +283,7 @@ window.BDAY = {
         }
       },
       {
-        id: "little-moments", secretTitle: "Just Because...", title: "Little moments",
+        id: "little-moments", secretTitle: "Just Because...", title: "Just Because...Little moments",
         src: "assets/archive/little-moments.mp4", poster: "assets/archive/little-moments.jpg",
         lock: {
           type: "memory", hint: "a little game",

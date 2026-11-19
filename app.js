@@ -866,9 +866,15 @@
     return P2.media.filter((m) => !m.off).map((m) => ({ type: isVid(m) ? "video" : "photo", src: mediaSrc(m) }))
       .filter((x) => !seen.has(x.src) && seen.add(x.src));
   }
+  const TYPES = { mp3: "audio/mpeg", mpeg: "audio/mpeg", mpga: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav",
+                  mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+  const typeFor = (src) => TYPES[(String(src).split("?")[0].split(".").pop() || "").toLowerCase()] || "";
   async function grab(src) {
     for (let attempt = 0; attempt < 3; attempt++) {           // a couple of retries for a flaky connection
-      try { const r = await fetch(src); if (r.ok) return URL.createObjectURL(await r.blob()); } catch (e) {}
+      try {
+        const r = await fetch(src);
+        if (r.ok) { const b = await r.blob(); const t = typeFor(src) || b.type; return URL.createObjectURL(t && t !== b.type ? new Blob([b], { type: t }) : b); }
+      } catch (e) {}
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
     }
     return null;
@@ -1205,7 +1211,17 @@
       };
       if (song) {
         song.readyState >= 1 ? onMeta() : song.addEventListener("loadedmetadata", onMeta, { once: true });
-        song.addEventListener("error", () => { useAudioClock = false; filmTap.hidden = true; }, { once: true });
+        const fallback = () => {
+          const from = song.getAttribute("src") || "";
+          if (from.startsWith("blob:") && token === enterToken) {               // the downloaded copy failed: stream the file instead
+            song.src = src; song.addEventListener("loadedmetadata", () => { try { song.currentTime = S; } catch (e) {} onMeta(); }, { once: true });
+            song.play().catch(() => {});                                       // if this needs a tap, "▶ tap to play" appears
+            song.addEventListener("error", () => { useAudioClock = false; filmTap.hidden = true; }, { once: true });
+            return;
+          }
+          useAudioClock = false; filmTap.hidden = true;
+        };
+        if (song.error) fallback(); else song.addEventListener("error", fallback, { once: true });
       }
       poke();
     });

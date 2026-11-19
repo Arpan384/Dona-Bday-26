@@ -52,7 +52,7 @@ window.BDAY = {
       runtime: "4:25",
       poster: "assets/photos/2023-7.jpg",
       unlock: { dayOffset: 0, time: "11:55" },     // 11:00 AM on her birthday
-      song: "assets/music/part2.mpeg",               // ✏️ the ~4:25 personalised song
+      song: "assets/music/part2.mp3",               // ✏️ the ~4:25 personalised song
       songStart: "0:00"   // ✏️ the film is timed from here to the end of the song
     },
     {

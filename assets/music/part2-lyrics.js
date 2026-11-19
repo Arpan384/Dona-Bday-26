@@ -1,4 +1,4 @@
-/* Lyrics for Part II, timed to assets/music/part2.mpeg
+/* Lyrics for Part II, timed to assets/music/part2.mp3
    Format:  [mm:ss.xx] line      → line appears at that moment of the SONG (not the film)
             [mm:ss.xx]           → empty = clear the subtitle (instrumental gaps)
             # Section name       → label; lines under "# Chorus" are styled a little differently

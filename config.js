@@ -306,7 +306,7 @@ window.BDAY = {
     song: "assets/music/bonus.mp3",
     songStart: "0:00",                              // ✏️ where the song begins, "m:ss"
     musicVolume: 0.9,                               // normal level
-    duckTo: 0.08,                                   // almost silent while your recorded video plays
+    duckTo: 0.07,                                   // almost silent while your recorded video plays
 
     // the card on the home screen
     card: {
